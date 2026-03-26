@@ -1,8 +1,19 @@
-# ─── Core web server ───────────────────────────────────────────────
-Flask==3.0.3
+# ─────────────────────────────────────────────────────────────
+# FocusEye — Python Dependencies
+# Install with:  pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────
 
-# ─── Optional: server-side ML processing (future extension) ────────
-# Uncomment these if you want to add Python-based frame processing
-# mediapipe==0.10.14
-# opencv-python==4.10.0.84
-# numpy==1.26.4
+# Web server
+Flask==3.0.3
+flask-socketio==5.3.6
+simple-websocket==1.0.0     # required for threading async mode
+
+# Computer vision
+opencv-python==4.10.0.84
+
+# AI / ML
+mediapipe==0.10.33          # face mesh, iris tracking, head pose
+numpy>=1.24.0,<2.0          # mediapipe requires numpy < 2.x
+
+# Phone detection (YOLOv8 — downloads ~6 MB weights on first run)
+ultralytics>=8.0.0
