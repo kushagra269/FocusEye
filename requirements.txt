@@ -1,0 +1,8 @@
+# ─── Core web server ───────────────────────────────────────────────
+Flask==3.0.3
+
+# ─── Optional: server-side ML processing (future extension) ────────
+# Uncomment these if you want to add Python-based frame processing
+# mediapipe==0.10.14
+# opencv-python==4.10.0.84
+# numpy==1.26.4
