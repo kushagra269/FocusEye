@@ -13,9 +13,13 @@ import threading
 
 class FocusTracker:
 
-    # Smoothing: frames of consecutive "away" needed to start an event
-    _FRAMES_TO_START = 20   # ~0.67 s at 30 FPS
-    _FRAMES_TO_END   = 15   # ~0.5  s
+    # Smoothing: frames to start/end a distraction event
+    _FRAMES_TO_START = 20    # ~0.67 s at 30 FPS — frames of "away" to trigger distraction
+    _FRAMES_TO_END   = 300   # 10 s at 30 FPS — frames of screen-facing to recover focus
+
+    # Recovery: for every ms of focused time, recover this many ms of away time.
+    # 0.5 means 1 s of focus recovers 0.5 s of recorded distraction.
+    _RECOVERY_RATE = 0.5
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -63,8 +67,12 @@ class FocusTracker:
         now = time.time() * 1000
         self._state = {
             # smoothing counters
-            'away_frames':  0,
-            'focus_frames': 0,
+            'away_frames':    0,
+            'focus_frames':   0,
+            # re-focus: consecutive frames user is screen-facing while distracted
+            # uses lenient absolute angle check, not deviation-from-baseline,
+            # so user recovers from ANY comfortable screen-facing position.
+            'refocus_frames': 0,
             # distraction episode
             'is_distracted':         False,
             'distraction_start_ms':  None,
@@ -99,6 +107,10 @@ class FocusTracker:
         currently_away = (analysis.get('looking_away', False)
                           or analysis.get('phone_detected', False))
 
+        # screen_facing: lenient check — face detected + absolute head angles
+        # within tolerance.  Does NOT require returning to calibrated position.
+        screen_facing = analysis.get('screen_facing', False)
+
         # ── Frame counters ─────────────────────────────────
         thresh = st.get('away_frames_threshold', self._FRAMES_TO_START)
         if currently_away:
@@ -114,14 +126,32 @@ class FocusTracker:
             st['is_distracted']        = True
             st['distraction_start_ms'] = now
             st['away_events']         += 1
+            st['refocus_frames']       = 0   # reset re-focus counter on new distraction
 
         # ── End distraction episode ───────────────────────
-        if (st['is_distracted']
-                and st['focus_frames'] >= self._FRAMES_TO_END):
-            if st['distraction_start_ms']:
-                st['total_away_ms'] += now - st['distraction_start_ms']
-                st['distraction_start_ms'] = None
-            st['is_distracted'] = False
+        # Recovery requires looking at screen (lenient) for _FRAMES_TO_END
+        # consecutive frames — user does NOT need to return to initial position.
+        if st['is_distracted']:
+            if screen_facing and not analysis.get('phone_detected', False):
+                st['refocus_frames'] += 1
+            else:
+                st['refocus_frames'] = 0
+
+            if st['refocus_frames'] >= self._FRAMES_TO_END:
+                if st['distraction_start_ms']:
+                    st['total_away_ms'] += now - st['distraction_start_ms']
+                    st['distraction_start_ms'] = None
+                st['is_distracted']  = False
+                st['refocus_frames'] = 0
+        else:
+            st['refocus_frames'] = 0
+
+        # ── Recovery: focused time slowly reduces recorded away time ──
+        # Only applies while not distracted and not currently looking away,
+        # so brief focus gaps don't erase earned distraction time.
+        if not st['is_distracted'] and not currently_away:
+            recover = 33 * self._RECOVERY_RATE   # ms recovered this frame
+            st['total_away_ms'] = max(0.0, st['total_away_ms'] - recover)
 
         # ── Live away time (current episode) ─────────────
         live_ms = ((now - st['distraction_start_ms'])

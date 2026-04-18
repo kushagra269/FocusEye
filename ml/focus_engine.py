@@ -101,6 +101,17 @@ class FocusEngine:
             'hand_lms_list': [],    'pose_lms':      None,
         }
 
+    def reset(self):
+        """Re-run calibration at the start of a new session."""
+        self.gaze.reset_calibration()
+        self.hand_pose.reset_calibration()
+        self._last_phones = []
+        self._last_hp = {
+            'hand_detected': False, 'grip_detected': False,
+            'wrist_raised':  False, 'posture_phone': False,
+            'hand_lms_list': [],    'pose_lms':      None,
+        }
+
     # ─────────────────────────────────────────────────────────
     # PUBLIC: analyze
     # ─────────────────────────────────────────────────────────
@@ -161,6 +172,10 @@ class FocusEngine:
         if (phone_gesture or phone_posture) and not phone_yolo:
             self._draw_gesture_banner(ann, w, phone_reason)
 
+        # ── Calibration progress bar (shown while warming up) ──
+        if not self.gaze.calibrated:
+            self._draw_calibration_bar(ann, self.gaze.calib_progress, w, h)
+
         analysis = {
             'face_detected':  gaze_data['face_detected'],
             'gaze_ratio':     gaze_data['gaze_ratio'],
@@ -168,6 +183,7 @@ class FocusEngine:
             'head_pitch':     gaze_data['head_pitch'],
             'looking_away':   gaze_data['looking_away'],
             'reason':         gaze_data['reason'],
+            'screen_facing':  gaze_data.get('screen_facing', False),
             'phone_detected': phone_detected,
             'phone_count':    len(phone_list),
             'phone_reason':   phone_reason,
@@ -346,6 +362,26 @@ class FocusEngine:
                       (bx + tw + 8, by + 6), (0, 40, 150), -1)
         cv2.putText(frame, text, (bx, by),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, C_AMBER, 2)
+
+    @staticmethod
+    def _draw_calibration_bar(frame, progress: float, w, h):
+        """
+        Show a progress bar at the bottom of the frame during calibration.
+        Progress 0.0 – 1.0.  Disappears once calibration is complete.
+        """
+        text = 'CALIBRATING — look at screen naturally'
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        ty = h - 40
+        cv2.putText(frame, text, ((w - tw) // 2, ty),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, C_AMBER, 1)
+        # Bar background
+        bx, by = 20, h - 22
+        bar_w  = w - 40
+        cv2.rectangle(frame, (bx, by), (bx + bar_w, by + 10), C_DIM, -1)
+        # Filled portion
+        filled = int(bar_w * progress)
+        if filled > 0:
+            cv2.rectangle(frame, (bx, by), (bx + filled, by + 10), C_TEAL, -1)
 
     @staticmethod
     def _fmt(ms: float) -> str:

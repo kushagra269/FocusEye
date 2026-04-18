@@ -110,6 +110,7 @@ def on_start():
             return
         _cam_running = True
         tracker.reset()
+        focus_engine.reset()        # recalibrate head/body baseline
         _cam_thread = threading.Thread(target=_camera_loop, daemon=True)
         _cam_thread.start()
     emit('session_event', {'type': 'started'})
