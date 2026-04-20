@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusEye — AI-Powered Focus Tool</title>
+  <meta name="description" content="FocusEye uses computer vision to detect when you look away and instantly blocks distracting websites. 100% local, CPU-only, no cloud.">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ════════════════════════════════════════════════════
+       DESIGN TOKENS
+    ════════════════════════════════════════════════════ */
+    :root {
+      --background:          hsl(220, 30%, 4%);
+      --foreground:          hsl(160, 30%, 96%);
+      --card:                hsl(220, 28%, 7%);
+      --card-foreground:     hsl(160, 30%, 96%);
+      --primary:             hsl(158, 100%, 52%);
+      --primary-foreground:  hsl(220, 40%, 5%);
+      --primary-glow:        hsl(158, 100%, 65%);
+      --secondary:           hsl(320, 100%, 60%);
+      --secondary-foreground:hsl(220, 40%, 5%);
+      --muted:               hsl(220, 20%, 12%);
+      --muted-foreground:    hsl(160, 10%, 65%);
+      --accent:              hsl(190, 100%, 55%);
+      --accent-foreground:   hsl(220, 40%, 5%);
+      --destructive:         hsl(0, 90%, 60%);
+      --border:              hsl(160, 30%, 14%);
+      --ring:                hsl(158, 100%, 52%);
+      --radius:              0.25rem;
+
+      --gradient-hero:
+        radial-gradient(ellipse at top, hsl(158 100% 52% / 0.15), transparent 60%),
+        radial-gradient(ellipse at bottom right, hsl(320 100% 60% / 0.12), transparent 60%),
+        linear-gradient(180deg, hsl(220 30% 4%), hsl(220 35% 6%));
+      --gradient-primary:    linear-gradient(135deg, hsl(158 100% 52%), hsl(190 100% 55%));
+      --gradient-text:       linear-gradient(135deg, hsl(160 30% 98%), hsl(158 100% 75%));
+      --gradient-card:       linear-gradient(145deg, hsl(220 28% 8% / 0.8), hsl(220 28% 5% / 0.4));
+
+      --glow-primary:        0 0 40px hsl(158 100% 52% / 0.4), 0 0 80px hsl(158 100% 52% / 0.2);
+      --glow-soft:           0 0 60px hsl(158 100% 52% / 0.15);
+      --shadow-card:         0 1px 0 hsl(160 30% 30% / 0.1) inset, 0 20px 40px -10px hsl(220 50% 0% / 0.5);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    /* ── BODY ── */
+    body {
+      background-color: hsl(220, 30%, 4%);
+      color: hsl(160, 30%, 96%);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      background-image:
+        linear-gradient(hsl(160 30% 14% / 0.4) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(160 30% 14% / 0.4) 1px, transparent 1px);
+      background-size: 64px 64px;
+      background-position: -1px -1px;
+    }
+
+    /* hero radial gradient overlay — fixed, always behind content */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at top, hsl(158 100% 52% / 0.15), transparent 60%),
+        radial-gradient(ellipse at bottom right, hsl(320 100% 60% / 0.12), transparent 60%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: hsl(158 100% 52% / 0.3); border-radius: 2px; }
+
+    /* ── CONTAINER ── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ════════════════════════════════════════════════════
+       UTILITY CLASSES
+    ════════════════════════════════════════════════════ */
+
+    .glass-card {
+      background: linear-gradient(145deg, hsl(220 28% 8% / 0.8), hsl(220 28% 5% / 0.4));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid hsl(160 30% 14%);
+      box-shadow: 0 1px 0 hsl(160 30% 30% / 0.1) inset, 0 20px 40px -10px hsl(220 50% 0% / 0.5);
+    }
+
+    .text-gradient-primary {
+      background: linear-gradient(135deg, hsl(158 100% 52%), hsl(190 100% 55%));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(158 100% 52%);
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: hsl(158 100% 52%);
+      color: hsl(220 40% 5%);
+      font-weight: 600;
+      font-size: 14px;
+      padding: 14px 24px;
+      border-radius: 4px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: box-shadow 0.3s, transform 0.2s;
+    }
+    .btn-primary:hover {
+      animation: pulse-glow 3s ease-in-out infinite;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid hsl(160 30% 14%);
+      background: hsl(220 28% 7% / 0.5);
+      color: hsl(160 30% 96%);
+      backdrop-filter: blur(4px);
+      font-size: 14px;
+      padding: 14px 24px;
+      border-radius: 4px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: hsl(158 100% 52% / 0.5);
+      background: hsl(220 28% 7%);
+    }
+
+    /* ════════════════════════════════════════════════════
+       KEYFRAME ANIMATIONS
+    ════════════════════════════════════════════════════ */
+    @keyframes scan {
+      0%   { transform: translateY(-100%); }
+      100% { transform: translateY(2000%); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px hsl(158 100% 52% / 0.4), 0 0 40px hsl(158 100% 52% / 0.2); }
+      50%       { box-shadow: 0 0 40px hsl(158 100% 52% / 0.7), 0 0 80px hsl(158 100% 52% / 0.4); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    @keyframes float-sm {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-8px); }
+    }
+
+    @keyframes blink {
+      0%, 90%, 100% { transform: scaleY(1); }
+      95%           { transform: scaleY(0.05); }
+    }
+
+    @keyframes ticker {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @keyframes spin-cw {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    @keyframes spin-ccw {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(-360deg); }
+    }
+
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fade-in-left {
+      from { opacity: 0; transform: translateX(-30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes fade-in-right {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes scan-vertical {
+      0%   { top: 20%; }
+      50%  { top: 80%; }
+      100% { top: 20%; }
+    }
+
+    @keyframes navbar-drop {
+      from { opacity: 0; transform: translateY(-40px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes eye-draw {
+      from { stroke-dashoffset: 500; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    @keyframes iris-grow {
+      from { transform: scale(0); transform-origin: 100px 100px; }
+      to   { transform: scale(1); transform-origin: 100px 100px; }
+    }
+
+    /* Animation helper classes */
+    .animate-ticker       { animation: ticker 30s linear infinite; }
+    .animate-pulse-glow   { animation: pulse-glow 3s ease-in-out infinite; }
+    .animate-float        { animation: float 6s ease-in-out infinite; }
+    .animate-spin-cw      { animation: spin-cw 30s linear infinite; }
+    .animate-spin-ccw     { animation: spin-ccw 45s linear infinite; }
+    .animate-blink        { animation: blink 4s ease-in-out infinite; }
+    .animate-pulse        { animation: pulse-glow 2s ease-in-out infinite; }
+
+    /* ════════════════════════════════════════════════════
+       SCROLL ENTRANCE ANIMATIONS
+    ════════════════════════════════════════════════════ */
+    [data-animate] {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+    [data-animate].is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    [data-animate][data-delay="1"] { transition-delay: 0.1s; }
+    [data-animate][data-delay="2"] { transition-delay: 0.2s; }
+    [data-animate][data-delay="3"] { transition-delay: 0.3s; }
+    [data-animate][data-delay="4"] { transition-delay: 0.4s; }
+    [data-animate][data-delay="5"] { transition-delay: 0.5s; }
+    [data-animate][data-delay="6"] { transition-delay: 0.6s; }
+    [data-animate][data-delay="7"] { transition-delay: 0.7s; }
+
+    [data-animate].animate-from-left {
+      transform: translateX(-30px);
+    }
+    [data-animate].animate-from-left.is-visible {
+      transform: translateX(0);
+    }
+
+    [data-animate].animate-from-right {
+      transform: translateX(30px);
+    }
+    [data-animate].animate-from-right.is-visible {
+      transform: translateX(0);
+    }
+
+    /* ════════════════════════════════════════════════════
+       NAVBAR
+    ════════════════════════════════════════════════════ */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: hsl(220 30% 4% / 0.6);
+      border-bottom: 1px solid hsl(160 30% 14%);
+      animation: navbar-drop 0.6s ease-out both;
+    }
+
+    .nav-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: hsl(160 30% 96%);
+      position: relative;
+    }
+
+    .logo-icon-wrap {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      background: hsl(158 100% 52% / 0.4);
+      border-radius: 50%;
+      filter: blur(8px);
+    }
+
+    .logo-icon-wrap svg {
+      position: relative;
+      z-index: 1;
+      color: hsl(158 100% 52%);
+    }
+
+    .logo-text { color: hsl(160 30% 96%); }
+    .logo-eye  { color: hsl(158 100% 52%); }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    nav a {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      color: hsl(160 10% 65%);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: hsl(160 30% 96%); }
+
+    .nav-cta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      background: hsl(158 100% 52%);
+      color: hsl(220 40% 5%);
+      padding: 8px 16px;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: box-shadow 0.3s;
+    }
+    .nav-cta:hover {
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    /* ════════════════════════════════════════════════════
+       HERO
+    ════════════════════════════════════════════════════ */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-top: 64px;
+    }
+
+    .hero-bg-grid {
+      position: absolute;
+      inset: 0;
+      opacity: 0.4;
+      background-image:
+        linear-gradient(hsl(158 100% 52% / 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(158 100% 52% / 0.15) 1px, transparent 1px);
+      background-size: 40px 40px;
+      -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+      mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 58fr 42fr;
+      gap: 48px;
+      align-items: center;
+      padding: 80px 24px 120px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Live badge */
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid hsl(158 100% 52% / 0.3);
+      background: hsl(158 100% 52% / 0.05);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(158 100% 52%);
+      margin-bottom: 28px;
+      animation: fade-in-up 0.6s ease-out both;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: hsl(158 100% 52%);
+      animation: pulse-glow 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    /* H1 */
+    .hero-h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: clamp(48px, 8vw, 96px);
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin-bottom: 28px;
+      animation: fade-in-up 0.8s ease-out 0.1s both;
+    }
+
+    /* Paragraph */
+    .hero-p {
+      font-size: clamp(16px, 2vw, 20px);
+      color: hsl(160 10% 65%);
+      max-width: 540px;
+      line-height: 1.6;
+      margin-bottom: 36px;
+      animation: fade-in-up 0.6s ease-out 0.3s both;
+    }
+
+    /* CTA row */
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 56px;
+      animation: fade-in-up 0.6s ease-out 0.5s both;
+    }
+
+    /* Stats strip */
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 400px;
+      animation: fade-in-up 0.6s ease-out 0.7s both;
+    }
+
+    .hero-stat {
+      border-left: 2px solid hsl(158 100% 52% / 0.4);
+      padding-left: 16px;
+    }
+
+    .hero-stat-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      color: hsl(160 30% 96%);
+      display: block;
+    }
+
+    .hero-stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(160 10% 65%);
+      display: block;
+      margin-top: 4px;
+    }
+
+    /* ── Eye Visual ── */
+    .eye-visual-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 1;
+      margin: 0 auto;
+      animation: fade-in-up 1s ease-out 0.4s both;
+    }
+
+    .eye-ring-outer {
+      position: absolute;
+      inset: 0;
+      border: 1px dashed hsl(158 100% 52% / 0.2);
+      border-radius: 50%;
+      animation: spin-cw 30s linear infinite;
+    }
+
+    .eye-ring-inner {
+      position: absolute;
+      inset: 24px;
+      border: 1px dashed hsl(190 100% 55% / 0.2);
+      border-radius: 50%;
+      animation: spin-ccw 45s linear infinite;
+    }
+
+    .eye-glow-disk {
+      position: absolute;
+      inset: 48px;
+      background: linear-gradient(135deg, hsl(158 100% 52%), hsl(190 100% 55%));
+      border-radius: 50%;
+      opacity: 0.2;
+      filter: blur(40px);
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    .eye-svg-wrap {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 66%;
+      height: 66%;
+    }
+
+    .eye-svg-wrap svg {
+      width: 100%;
+      height: 100%;
+      animation: blink 4s ease-in-out infinite;
+    }
+
+    .eye-path {
+      stroke-dasharray: 500;
+      stroke-dashoffset: 500;
+      animation: eye-draw 1.5s ease-out 0.6s forwards;
+    }
+
+    .iris-outer {
+      animation: iris-grow 0.5s ease-out 1.2s both;
+    }
+
+    .eye-scan-line {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, hsl(158 100% 52%), transparent);
+      box-shadow: 0 0 12px hsl(158 100% 52%);
+      animation: scan-vertical 4s ease-in-out infinite;
+    }
+
+    /* Floating data cards */
+    .data-card {
+      position: absolute;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .data-card-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: hsl(160 10% 65%);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .data-card-val {
+      font-size: 12px;
+      font-weight: 500;
+      color: hsl(158 100% 52%);
+      display: block;
+    }
+
+    .card-gaze {
+      top: 8%;
+      left: -8%;
+      animation: float-sm 4s ease-in-out infinite;
+    }
+
+    .card-focus {
+      bottom: 10%;
+      right: -6%;
+      animation: float-sm 5s ease-in-out infinite reverse;
+    }
+
+    .card-pose {
+      top: 42%;
+      right: -10%;
+      animation: float-sm 4.5s ease-in-out 1s infinite;
+    }
+
+    /* Ticker */
+    .hero-ticker {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid hsl(160 30% 14%);
+      border-bottom: 1px solid hsl(160 30% 14%);
+      background: hsl(220 30% 4% / 0.8);
+      backdrop-filter: blur(8px);
+      padding: 12px 0;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .ticker-track {
+      display: flex;
+      white-space: nowrap;
+      animation: ticker 30s linear infinite;
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 32px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(160 10% 65%);
+    }
+
+    .ticker-item svg {
+      color: hsl(158 100% 52%);
+      flex-shrink: 0;
+    }
+
+    /* ════════════════════════════════════════════════════
+       SECTION — SIGNALS / HOW IT WORKS
+    ════════════════════════════════════════════════════ */
+    #how {
+      padding: 128px 0;
+    }
+
+    .section-heading {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+
+    .section-subtext {
+      font-size: 18px;
+      color: hsl(160 10% 65%);
+      line-height: 1.6;
+      max-width: 560px;
+      margin-bottom: 64px;
+    }
+
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .signal-card {
+      border-radius: 4px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.5s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .signal-card:hover {
+      border-color: hsl(158 100% 52% / 0.5);
+    }
+
+    .signal-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: hsl(158 100% 52%);
+      box-shadow: 0 0 12px hsl(158 100% 52%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .signal-card:hover::after {
+      opacity: 1;
+    }
+
+    .card-num {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: hsl(160 10% 65%);
+    }
+
+    .card-icon-wrap {
+      width: 48px;
+      height: 48px;
+      background: hsl(158 100% 52% / 0.1);
+      border: 1px solid hsl(158 100% 52% / 0.3);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      color: hsl(158 100% 52%);
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .signal-card:hover .card-icon-wrap {
+      background: hsl(158 100% 52% / 0.18);
+      transform: scale(1.1);
+    }
+
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .card-tech {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: hsl(158 100% 52% / 0.8);
+      margin-bottom: 16px;
+    }
+
+    .card-desc {
+      font-size: 15px;
+      color: hsl(160 10% 65%);
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    .card-divider {
+      border: none;
+      border-top: 1px solid hsl(160 30% 14%);
+      margin: 24px 0 20px;
+    }
+
+    .card-metric-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 32px;
+      background: linear-gradient(135deg, hsl(158 100% 52%), hsl(190 100% 55%));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: block;
+    }
+
+    .card-metric-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(160 10% 65%);
+      display: block;
+      margin-top: 4px;
+    }
+
+    /* ════════════════════════════════════════════════════
+       SECTION — FEATURES
+    ════════════════════════════════════════════════════ */
+    #features {
+      padding: 128px 0;
+      text-align: center;
+    }
+
+    #features .section-subtext {
+      margin: 0 auto 64px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: hsl(160 30% 14%);
+      border: 1px solid hsl(160 30% 14%);
+      border-radius: 4px;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .feature-cell {
+      background: hsl(220 28% 7%);
+      padding: 32px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .feature-cell:hover {
+      background: hsl(220 20% 12% / 0.5);
+    }
+
+    .feature-cell:hover .feature-icon {
+      transform: scale(1.1) rotate(-6deg);
+    }
+
+    .feature-num {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: hsl(160 10% 65% / 0.4);
+    }
+
+    .feature-icon {
+      color: hsl(158 100% 52%);
+      margin-bottom: 16px;
+      transition: transform 0.2s;
+      display: block;
+    }
+
+    .feature-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      margin-bottom: 10px;
+      letter-spacing: -0.01em;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: hsl(160 10% 65%);
+      line-height: 1.6;
+    }
+
+    /* ════════════════════════════════════════════════════
+       SECTION — ARCHITECTURE
+    ════════════════════════════════════════════════════ */
+    #architecture {
+      padding: 128px 0;
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 58fr 42fr;
+      gap: 48px;
+      align-items: start;
+    }
+
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .pipeline-stage {
+      border-radius: 4px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: border-color 0.2s;
+    }
+
+    .pipeline-stage:hover {
+      border-color: hsl(158 100% 52% / 0.5);
+    }
+
+    .pipeline-stage-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: hsl(160 10% 65%);
+      flex-shrink: 0;
+      width: 24px;
+    }
+
+    .pipeline-stage-info {
+      flex: 1;
+    }
+
+    .pipeline-stage-label {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 18px;
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+
+    .pipeline-stage-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: hsl(160 10% 65%);
+    }
+
+    .pipeline-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: hsl(158 100% 52%);
+      animation: pulse-glow 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .pipeline-arrow {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0;
+      color: hsl(158 100% 52% / 0.5);
+    }
+
+    /* Sticky code panel */
+    .arch-right {
+      position: sticky;
+      top: 96px;
+    }
+
+    .code-panel {
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .code-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: hsl(220 20% 12% / 0.3);
+      border-bottom: 1px solid hsl(160 30% 14%);
+    }
+
+    .traffic-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot-red    { width: 10px; height: 10px; border-radius: 50%; background: hsl(0 90% 60% / 0.6); }
+    .dot-yellow { width: 10px; height: 10px; border-radius: 50%; background: hsl(320 100% 60% / 0.6); }
+    .dot-green  { width: 10px; height: 10px; border-radius: 50%; background: hsl(158 100% 52% / 0.6); }
+
+    .code-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: hsl(160 10% 65%);
+    }
+
+    .code-content {
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: hsl(160 30% 96%);
+    }
+
+    .code-muted   { color: hsl(160 10% 45%); }
+    .code-primary { color: hsl(158 100% 52%); }
+    .code-secondary { color: hsl(320 100% 60%); }
+    .code-accent  { color: hsl(190 100% 55%); }
+
+    /* ════════════════════════════════════════════════════
+       SECTION — INSTALL
+    ════════════════════════════════════════════════════ */
+    #install {
+      padding: 128px 0;
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+
+    .req-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 380px;
+      margin-top: 40px;
+    }
+
+    .req-cell {
+      border-left: 2px solid hsl(158 100% 52% / 0.4);
+      padding-left: 12px;
+    }
+
+    .req-key {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: hsl(160 10% 65%);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .req-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      display: block;
+    }
+
+    /* Terminal panel */
+    .terminal-panel {
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .terminal-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: hsl(220 20% 12% / 0.3);
+      border-bottom: 1px solid hsl(160 30% 14%);
+    }
+
+    .terminal-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: hsl(160 10% 65%);
+    }
+
+    .terminal-content {
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    .term-comment { color: hsl(160 10% 45%); }
+    .term-prompt  { color: hsl(158 100% 52%); }
+    .term-cmd     { color: hsl(160 30% 96%); }
+
+    .term-group { margin-bottom: 16px; }
+
+    .term-success {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid hsl(160 30% 14%);
+      color: hsl(158 100% 52%);
+    }
+
+    .install-btns {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 0;
+      margin-top: 28px;
+    }
+
+    .install-subtext {
+      font-size: 16px;
+      color: hsl(160 10% 65%);
+      line-height: 1.6;
+      margin-bottom: 4px;
+    }
+
+    /* ════════════════════════════════════════════════════
+       FOOTER
+    ════════════════════════════════════════════════════ */
+    footer {
+      border-top: 1px solid hsl(160 30% 14%);
+      padding: 48px 0;
+      margin-top: 80px;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .footer-logo-wrap .logo { margin-bottom: 10px; }
+
+    .footer-tagline {
+      font-size: 14px;
+      color: hsl(160 10% 65%);
+      line-height: 1.5;
+    }
+
+    .footer-motto {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: hsl(160 10% 65%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .footer-motto-dot {
+      color: hsl(158 100% 52%);
+    }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 40px;
+      border-top: 1px solid hsl(160 30% 14%);
+    }
+
+    .footer-copy {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: hsl(160 10% 65%);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: hsl(160 10% 65%);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: hsl(160 30% 96%); }
+
+    /* ════════════════════════════════════════════════════
+       RESPONSIVE
+    ════════════════════════════════════════════════════ */
+    @media (max-width: 1024px) {
+      .arch-grid { grid-template-columns: 1fr; }
+      .arch-right { position: static; }
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      nav { display: none; }
+
+      .hero-content {
+        grid-template-columns: 1fr;
+        padding: 60px 24px 100px;
+        gap: 56px;
+      }
+
+      .eye-visual-wrap { max-width: 320px; }
+
+      .signals-grid { grid-template-columns: 1fr; }
+
+      .features-grid { grid-template-columns: 1fr; }
+
+      .install-grid { grid-template-columns: 1fr; gap: 40px; }
+
+      .hero-stats { grid-template-columns: repeat(3, 1fr); max-width: 100%; }
+
+      .card-gaze  { left: -4%; }
+      .card-focus { right: -4%; }
+      .card-pose  { right: -4%; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-stats { grid-template-columns: 1fr 1fr; }
+      .hero-cta   { flex-direction: column; }
+      footer .footer-top { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════ -->
+<header>
+  <div class="nav-inner">
+
+    <!-- Logo -->
+    <a href="#" class="logo">
+      <div class="logo-icon-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </div>
+      <span class="logo-text">Focus<span class="logo-eye">Eye</span></span>
+    </a>
+
+    <!-- Nav links -->
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#install">Install</a>
+    </nav>
+
+    <!-- CTA -->
+    <a href="/app" class="nav-cta">Launch App</a>
+
+  </div>
+</header>
+
+
+<!-- ══════════════════════════════════════════
+     HERO
+══════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-bg-grid"></div>
+
+  <div class="hero-content">
+
+    <!-- LEFT COLUMN -->
+    <div class="hero-left">
+
+      <!-- Live badge -->
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        LIVE · Computer Vision Active
+      </div>
+
+      <!-- H1 -->
+      <h1 class="hero-h1">
+        Eyes On.<br>
+        Distractions <span class="text-gradient-primary">Off.</span>
+      </h1>
+
+      <!-- Paragraph -->
+      <p class="hero-p">
+        FocusEye watches your webcam in real time. Look away, turn your head, or grab your phone —
+        and your distracting websites are <strong style="color: hsl(160 30% 96%); font-weight: 600;">instantly blocked</strong> until you refocus.
+      </p>
+
+      <!-- CTA buttons -->
+      <div class="hero-cta">
+        <a href="#install" class="btn-primary" id="hero-install-btn">
+          Install FocusEye
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </a>
+        <a href="#how" class="btn-secondary" id="hero-how-btn">See how it works</a>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <span class="hero-stat-val">30 FPS</span>
+          <span class="hero-stat-label">Real-time pipeline</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-val">478</span>
+          <span class="hero-stat-label">Face landmarks</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-val">3</span>
+          <span class="hero-stat-label">Detection signals</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN — Eye Visual -->
+    <div class="hero-right" style="display: flex; justify-content: center;">
+      <div class="eye-visual-wrap">
+        <!-- Rotating rings -->
+        <div class="eye-ring-outer"></div>
+        <div class="eye-ring-inner"></div>
+
+        <!-- Glow disk -->
+        <div class="eye-glow-disk"></div>
+
+        <!-- SVG Eye -->
+        <div class="eye-svg-wrap">
+          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <!-- Eye outline -->
+            <path class="eye-path"
+              d="M20 100 Q100 30 180 100 Q100 170 20 100 Z"
+              fill="none" stroke="hsl(158 100% 52%)" stroke-width="2"/>
+
+            <!-- Outer iris -->
+            <circle class="iris-outer" cx="100" cy="100" r="32"
+              fill="none" stroke="hsl(158 100% 52%)" stroke-width="1.5"/>
+
+            <!-- Inner iris fill -->
+            <circle cx="100" cy="100" r="22"
+              fill="hsl(158 100% 52% / 0.15)" stroke="hsl(158 100% 52%)" stroke-width="1"/>
+
+            <!-- Pupil -->
+            <circle id="pupil" cx="100" cy="100" r="10"
+              fill="hsl(158 100% 52%)"/>
+
+            <!-- Crosshairs -->
+            <line x1="100" y1="40" x2="100" y2="55"
+              stroke="hsl(158 100% 52%)" stroke-width="1" opacity="0.5"/>
+            <line x1="100" y1="145" x2="100" y2="160"
+              stroke="hsl(158 100% 52%)" stroke-width="1" opacity="0.5"/>
+            <line x1="40" y1="100" x2="55" y2="100"
+              stroke="hsl(158 100% 52%)" stroke-width="1" opacity="0.5"/>
+            <line x1="145" y1="100" x2="160" y2="100"
+              stroke="hsl(158 100% 52%)" stroke-width="1" opacity="0.5"/>
+          </svg>
+        </div>
+
+        <!-- Scan line -->
+        <div class="eye-scan-line"></div>
+
+        <!-- Floating data cards -->
+        <div class="data-card glass-card card-gaze">
+          <span class="data-card-label">Gaze ratio</span>
+          <span class="data-card-val">0.49 · LOCKED</span>
+        </div>
+
+        <div class="data-card glass-card card-focus">
+          <span class="data-card-label">Focus score</span>
+          <span class="data-card-val">94%</span>
+        </div>
+
+        <div class="data-card glass-card card-pose">
+          <span class="data-card-label">Yaw / Pitch</span>
+          <span class="data-card-val">+2° / −1°</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /hero-content -->
+
+  <!-- Ticker bar -->
+  <div class="hero-ticker">
+    <div class="ticker-track">
+      <!-- Set 1 -->
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        MediaPipe FaceMesh
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        OpenCV solvePnP
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        YOLOv8-nano
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Hand Pose
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Body Posture
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Real-time WebSocket
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Hosts File Blocker
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Flask + Socket.IO
+      </span>
+      <!-- Set 2 (duplicate for seamless loop) -->
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        MediaPipe FaceMesh
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        OpenCV solvePnP
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        YOLOv8-nano
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Hand Pose
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Body Posture
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Real-time WebSocket
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Hosts File Blocker
+      </span>
+      <span class="ticker-item">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Flask + Socket.IO
+      </span>
+    </div>
+  </div>
+
+</section><!-- /hero -->
+
+
+<!-- ══════════════════════════════════════════
+     HOW IT WORKS — SIGNALS
+══════════════════════════════════════════ -->
+<section id="how">
+  <div class="container">
+
+    <span class="section-label" data-animate>// 03 detection systems</span>
+
+    <h2 class="section-heading" data-animate data-delay="1">
+      Three signals.<br>
+      <span class="text-gradient-primary">One verdict.</span>
+    </h2>
+
+    <p class="section-subtext" data-animate data-delay="2">
+      Every frame, FocusEye runs a full computer-vision pipeline on your webcam — locally, on CPU. No cloud, no upload, no compromise.
+    </p>
+
+    <div class="signals-grid">
+
+      <!-- Card 01 — Eye Gaze -->
+      <div class="glass-card signal-card" data-animate data-delay="1" id="signal-card-01">
+        <span class="card-num">01</span>
+        <div class="card-icon-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <h3 class="card-title">Eye Gaze</h3>
+        <p class="card-tech">MediaPipe FaceMesh · 478 landmarks</p>
+        <p class="card-desc">
+          Tracks iris position relative to your eye socket. A gaze ratio outside 0.28–0.72 = looking away. 15s personal calibration on every session.
+        </p>
+        <hr class="card-divider">
+        <span class="card-metric-val">0.67s</span>
+        <span class="card-metric-label">to flag distraction</span>
+      </div>
+
+      <!-- Card 02 — Head Pose -->
+      <div class="glass-card signal-card" data-animate data-delay="2" id="signal-card-02">
+        <span class="card-num">02</span>
+        <div class="card-icon-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+          </svg>
+        </div>
+        <h3 class="card-title">Head Pose</h3>
+        <p class="card-tech">OpenCV solvePnP · 6-point 3D</p>
+        <p class="card-desc">
+          Maps facial anchors to a 3D model and decomposes rotation into yaw and pitch. Trips on ±20° yaw or ±22° pitch from your baseline.
+        </p>
+        <hr class="card-divider">
+        <span class="card-metric-val">±20°</span>
+        <span class="card-metric-label">yaw threshold</span>
+      </div>
+
+      <!-- Card 03 — Phone Use -->
+      <div class="glass-card signal-card" data-animate data-delay="3" id="signal-card-03">
+        <span class="card-num">03</span>
+        <div class="card-icon-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+            <line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+        </div>
+        <h3 class="card-title">Phone Use</h3>
+        <p class="card-tech">YOLOv8-nano + Hands + Pose</p>
+        <p class="card-desc">
+          Three independent signals: object detection, finger-grip pose, and forward-head reading posture. Catches the phone before you notice you reached for it.
+        </p>
+        <hr class="card-divider">
+        <span class="card-metric-val">3s</span>
+        <span class="card-metric-label">instant alert mode</span>
+      </div>
+
+    </div>
+  </div>
+</section><!-- /how -->
+
+
+<!-- ══════════════════════════════════════════
+     FEATURES
+══════════════════════════════════════════ -->
+<section id="features">
+  <div class="container">
+
+    <span class="section-label" data-animate>// capabilities</span>
+
+    <h2 class="section-heading" data-animate data-delay="1">
+      Built for <span class="text-gradient-primary">deep work.</span>
+    </h2>
+
+    <div class="features-grid" data-animate data-delay="2">
+
+      <!-- 01 -->
+      <div class="feature-cell" id="feat-01">
+        <span class="feature-num">01</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a10 10 0 0 1 10 10"/>
+          <path d="M12 2a10 10 0 0 0-10 10"/>
+          <path d="M12 22V12"/>
+          <path d="m15.5 6.5-3.5 5.5"/>
+        </svg>
+        <h3 class="feature-title">Live Focus Score</h3>
+        <p class="feature-desc">Real-time dashboard: focus %, away time, distraction events, session timer.</p>
+      </div>
+
+      <!-- 02 -->
+      <div class="feature-cell" id="feat-02">
+        <span class="feature-num">02</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h3 class="feature-title">OS-Level Site Blocker</h3>
+        <p class="feature-desc">Edits the hosts file — works in every browser, no extension, no proxy.</p>
+      </div>
+
+      <!-- 03 -->
+      <div class="feature-cell" id="feat-03">
+        <span class="feature-num">03</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <h3 class="feature-title">Instant Phone Alert</h3>
+        <p class="feature-desc">Holding your phone for 3s? Alarm fires immediately. No mercy mode.</p>
+      </div>
+
+      <!-- 04 -->
+      <div class="feature-cell" id="feat-04">
+        <span class="feature-num">04</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 7h-9"/>
+          <path d="M14 17H5"/>
+          <circle cx="17" cy="17" r="3"/>
+          <circle cx="7" cy="7" r="3"/>
+        </svg>
+        <h3 class="feature-title">Tunable Sensitivity</h3>
+        <p class="feature-desc">Low / Medium / High thresholds. Adjust without restarting the server.</p>
+      </div>
+
+      <!-- 05 -->
+      <div class="feature-cell" id="feat-05">
+        <span class="feature-num">05</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="6" height="6"/>
+          <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/>
+          <line x1="9" y1="2" x2="9" y2="9"/>
+          <line x1="15" y1="2" x2="15" y2="9"/>
+          <line x1="15" y1="15" x2="15" y2="22"/>
+          <line x1="9" y1="15" x2="9" y2="22"/>
+          <line x1="2" y1="9" x2="9" y2="9"/>
+          <line x1="2" y1="15" x2="9" y2="15"/>
+          <line x1="15" y1="9" x2="22" y2="9"/>
+          <line x1="15" y1="15" x2="22" y2="15"/>
+        </svg>
+        <h3 class="feature-title">CPU-Only, No GPU</h3>
+        <p class="feature-desc">Runs on a 4GB RAM laptop. ~30 FPS. Models auto-download on first run (~30 MB).</p>
+      </div>
+
+      <!-- 06 -->
+      <div class="feature-cell" id="feat-06">
+        <span class="feature-num">06</span>
+        <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <h3 class="feature-title">100% Local</h3>
+        <p class="feature-desc">Webcam never leaves your machine. No cloud, no telemetry, no account.</p>
+      </div>
+
+    </div>
+  </div>
+</section><!-- /features -->
+
+
+<!-- ══════════════════════════════════════════
+     ARCHITECTURE
+══════════════════════════════════════════ -->
+<section id="architecture">
+  <div class="container">
+
+    <span class="section-label" data-animate>// pipeline</span>
+
+    <h2 class="section-heading" data-animate data-delay="1">
+      From pixel<br>
+      <span class="text-gradient-primary">to verdict.</span>
+    </h2>
+
+    <p class="section-subtext" data-animate data-delay="2">
+      Every ~33ms, this pipeline runs end-to-end on your machine.
+    </p>
+
+    <div class="arch-grid">
+
+      <!-- LEFT — pipeline diagram -->
+      <div class="pipeline">
+
+        <div class="glass-card pipeline-stage" data-animate data-animate-class="animate-from-left" id="pipe-01">
+          <span class="pipeline-stage-num">01</span>
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Webcam</div>
+            <div class="pipeline-stage-sub">OpenCV · 1280×720</div>
+          </div>
+          <div class="pipeline-pulse"></div>
+        </div>
+
+        <div class="pipeline-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <polyline points="19 12 12 19 5 12"/>
+          </svg>
+        </div>
+
+        <div class="glass-card pipeline-stage" data-animate data-animate-class="animate-from-left" data-delay="1" id="pipe-02">
+          <span class="pipeline-stage-num">02</span>
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">FocusEngine.analyze(frame)</div>
+            <div class="pipeline-stage-sub">Gaze · Phone · Hand+Pose</div>
+          </div>
+          <div class="pipeline-pulse"></div>
+        </div>
+
+        <div class="pipeline-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <polyline points="19 12 12 19 5 12"/>
+          </svg>
+        </div>
+
+        <div class="glass-card pipeline-stage" data-animate data-animate-class="animate-from-left" data-delay="2" id="pipe-03">
+          <span class="pipeline-stage-num">03</span>
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">FocusTracker.update()</div>
+            <div class="pipeline-stage-sub">State machine · scoring · alerts</div>
+          </div>
+          <div class="pipeline-pulse"></div>
+        </div>
+
+        <div class="pipeline-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <polyline points="19 12 12 19 5 12"/>
+          </svg>
+        </div>
+
+        <div class="glass-card pipeline-stage" data-animate data-animate-class="animate-from-left" data-delay="3" id="pipe-04">
+          <span class="pipeline-stage-num">04</span>
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Overlay + WebSocket emit</div>
+            <div class="pipeline-stage-sub">Annotated JPEG @ 30 FPS</div>
+          </div>
+          <div class="pipeline-pulse"></div>
+        </div>
+
+        <div class="pipeline-arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <polyline points="19 12 12 19 5 12"/>
+          </svg>
+        </div>
+
+        <div class="glass-card pipeline-stage" data-animate data-animate-class="animate-from-left" data-delay="4" id="pipe-05">
+          <span class="pipeline-stage-num">05</span>
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Browser dashboard</div>
+            <div class="pipeline-stage-sub">React-style UI · alert modal · blocker</div>
+          </div>
+          <div class="pipeline-pulse"></div>
+        </div>
+
+      </div><!-- /pipeline -->
+
+      <!-- RIGHT — code block -->
+      <div class="arch-right" data-animate data-animate-class="animate-from-right">
+        <div class="glass-card code-panel">
+          <div class="code-titlebar">
+            <div class="traffic-dots">
+              <span class="dot-red"></span>
+              <span class="dot-yellow"></span>
+              <span class="dot-green"></span>
+            </div>
+            <span class="code-filename">focus_engine.py</span>
+          </div>
+          <div class="code-content">
+<span class="code-muted"># every frame, ~33ms</span>
+<br>
+<span class="code-secondary">analysis</span> = <span class="code-primary">FocusEngine</span>.analyze(frame)
+<br>
+<span class="code-muted">&nbsp;&nbsp;├─ gaze_ratio:&nbsp;&nbsp;&nbsp;&nbsp;0.49</span>
+<br>
+<span class="code-muted">&nbsp;&nbsp;├─ head_yaw:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+2.1°</span>
+<br>
+<span class="code-muted">&nbsp;&nbsp;├─ phone_detect:&nbsp;&nbsp;False</span>
+<br>
+<span class="code-muted">&nbsp;&nbsp;└─ grip_detect:&nbsp;&nbsp;&nbsp;False</span>
+<br><br>
+<span class="code-secondary">state</span> = <span class="code-primary">FocusTracker</span>.update(analysis)
+<br><br>
+<span class="code-accent">if</span> state.alert_needed:
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-primary">Blocker</span>.activate()
+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;socket.emit(<span class="code-primary">'alert'</span>, state)
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /arch-grid -->
+  </div>
+</section><!-- /architecture -->
+
+
+<!-- ══════════════════════════════════════════
+     INSTALL
+══════════════════════════════════════════ -->
+<section id="install">
+  <div class="container">
+
+    <div class="install-grid">
+
+      <!-- LEFT -->
+      <div data-animate data-animate-class="animate-from-left" id="install-left">
+        <span class="section-label">// install · 4 steps</span>
+
+        <h2 class="section-heading">
+          Up and running in<br>
+          <span class="text-gradient-primary">2 minutes.</span>
+        </h2>
+
+        <p class="install-subtext">
+          Python 3.9–3.11. Any webcam. CPU-only. Models (~30 MB) auto-download on first run.
+        </p>
+
+        <div class="install-btns">
+          <a href="https://github.com/kushagra269/FocusEye" target="_blank" class="btn-primary" id="install-github-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="m18 16 4-4-4-4"/>
+              <path d="m6 8-4 4 4 4"/>
+              <path d="m14.5 4-5 16"/>
+            </svg>
+            View on GitHub
+          </a>
+          <a href="/SETUP.md" class="btn-secondary" id="install-setup-btn">Read SETUP.md</a>
+        </div>
+
+        <div class="req-grid">
+          <div class="req-cell">
+            <span class="req-key">Python</span>
+            <span class="req-val">3.9 – 3.11</span>
+          </div>
+          <div class="req-cell">
+            <span class="req-key">RAM</span>
+            <span class="req-val">4 GB minimum</span>
+          </div>
+          <div class="req-cell">
+            <span class="req-key">GPU</span>
+            <span class="req-val">Not required</span>
+          </div>
+          <div class="req-cell">
+            <span class="req-key">OS</span>
+            <span class="req-val">Win / macOS / Linux</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT — terminal -->
+      <div data-animate data-animate-class="animate-from-right" id="install-right">
+        <div class="glass-card terminal-panel">
+          <div class="terminal-titlebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="hsl(158 100% 52%)" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            <span class="terminal-label">terminal</span>
+          </div>
+          <div class="terminal-content">
+
+            <div class="term-group">
+              <span class="term-comment"># Clone the repo</span><br>
+              <span class="term-prompt">$</span> <span class="term-cmd">git clone https://github.com/kushagra269/FocusEye.git</span>
+            </div>
+
+            <div class="term-group">
+              <span class="term-comment"># Create venv (Windows: .\Scripts\activate)</span><br>
+              <span class="term-prompt">$</span> <span class="term-cmd">python -m venv focuseye-env &amp;&amp; source focuseye-env/bin/activate</span>
+            </div>
+
+            <div class="term-group">
+              <span class="term-comment"># Install dependencies</span><br>
+              <span class="term-prompt">$</span> <span class="term-cmd">pip install -r requirements.txt</span>
+            </div>
+
+            <div class="term-group" style="margin-bottom: 0;">
+              <span class="term-comment"># Run (admin needed for hosts blocker)</span><br>
+              <span class="term-prompt">$</span> <span class="term-cmd">sudo python app.py</span>
+            </div>
+
+            <div class="term-success">
+              → Server running on http://localhost:5000 ✓
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section><!-- /install -->
+
+
+<!-- ══════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════ -->
+<footer>
+  <div class="container">
+
+    <div class="footer-top">
+
+      <div class="footer-logo-wrap">
+        <a href="#" class="logo" style="margin-bottom: 12px; display: inline-flex;">
+          <div class="logo-icon-wrap">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <span class="logo-text">Focus<span class="logo-eye">Eye</span></span>
+        </a>
+        <p class="footer-tagline">Open-source. Local-first. Watching so you don't have to.</p>
+      </div>
+
+      <div class="footer-motto">
+        <span class="footer-motto-dot">●</span>
+        Eyes on. Distractions off.
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <span class="footer-copy">© <span id="footer-year"></span> FocusEye Project</span>
+      <div class="footer-links">
+        <a href="https://github.com/kushagra269/FocusEye" target="_blank">GitHub</a>
+        <a href="#architecture">Docs</a>
+        <a href="#">License</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+  // ── Footer year ──
+  document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+  // ── Intersection Observer for scroll entrance animations ──
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('[data-animate]').forEach(el => {
+    // Apply left/right slide class if specified
+    const animClass = el.getAttribute('data-animate-class');
+    if (animClass) el.classList.add(animClass);
+    observer.observe(el);
+  });
+
+  // ── Pupil tracking animation (JS-driven for SVG cx/cy) ──
+  const pupil = document.getElementById('pupil');
+  const pupilPath = [
+    { cx: 100, cy: 100 },
+    { cx: 110, cy: 95 },
+    { cx: 90,  cy: 100 },
+    { cx: 100, cy: 105 },
+    { cx: 100, cy: 100 },
+  ];
+
+  let pupilStep = 0;
+  function animatePupil() {
+    const target = pupilPath[pupilStep % pupilPath.length];
+    pupil.setAttribute('cx', target.cx);
+    pupil.setAttribute('cy', target.cy);
+    pupilStep++;
+    setTimeout(animatePupil, 1500);
+  }
+  setTimeout(animatePupil, 2000);
+
+  // ── Pupil follows mouse cursor over eye visual ──
+  const eyeWrap = document.querySelector('.eye-visual-wrap');
+  if (eyeWrap) {
+    eyeWrap.addEventListener('mousemove', (e) => {
+      const rect = eyeWrap.getBoundingClientRect();
+      const cx = ((e.clientX - rect.left) / rect.width - 0.5) * 20 + 100;
+      const cy = ((e.clientY - rect.top) / rect.height - 0.5) * 20 + 100;
+      pupil.setAttribute('cx', Math.max(88, Math.min(112, cx)));
+      pupil.setAttribute('cy', Math.max(88, Math.min(112, cy)));
+    });
+
+    eyeWrap.addEventListener('mouseleave', () => {
+      pupil.setAttribute('cx', 100);
+      pupil.setAttribute('cy', 100);
+    });
+  }
+
+  // ── Smooth scroll for anchor links (offset for fixed header) ──
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', (e) => {
+      const target = document.querySelector(anchor.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        const top = target.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

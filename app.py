@@ -33,11 +33,17 @@ _cam_thread  = None
 _cam_lock    = threading.Lock()
 
 # ─────────────────────────────────────────────────────────
-# PAGE
+# PAGES
 # ─────────────────────────────────────────────────────────
 
 @app.route('/')
+def landing():
+    """Marketing / landing page. No WebSocket needed here."""
+    return render_template('landing.html')
+
+@app.route('/app')
 def index():
+    """Main FocusEye dashboard (camera + ML session)."""
     return render_template('index.html')
 
 # ─────────────────────────────────────────────────────────
